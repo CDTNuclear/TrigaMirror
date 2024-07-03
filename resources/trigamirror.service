@@ -1,0 +1,11 @@
+[Unit]
+Description=TrigaMirror
+After=network.target
+
+[Service]
+ExecStart=${CMAKE_INSTALL_BIN}/usr/local/bin/trigamirror -p %i
+Restart=always
+User=trigamirror
+
+[Install]
+WantedBy=multi-user.target
