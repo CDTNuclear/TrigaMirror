@@ -45,7 +45,7 @@ class TrigaMirror
     private:
         //Save header
         bool header;
-        std::string dataHeader;
+        std::string dataHeader = "";
 
         //Ponteiros inteligentes globais
         std::atomic<std::shared_ptr<std::string>> data_global = std::make_shared<std::string>();
@@ -55,6 +55,8 @@ class TrigaMirror
 
         //Threads de leitura de hardware
         void readFromServer(std::string ip, int port, int read_tax);
+
+        std::string readLine(int clientSocket);
 };
 
 #endif

@@ -86,30 +86,49 @@ void TrigaMirror::handleTCPClients(int clientSocket)
     // Create new thread
     std::thread([this, interval, clientSocket]()
     {
-        if(header) send(clientSocket, dataHeader.c_str(), sizeof(dataHeader), 0);
+        if(header) send(clientSocket, dataHeader.c_str(), dataHeader.length(), 0);
         while(true)
         {
             std::string data = *data_global.load();
-            if(send(clientSocket, data.c_str(), sizeof(data), 0) <= 0) break;
+            if(send(clientSocket, data.c_str(), data.length(), 0) <= 0) break;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(interval));
         }
     }).detach();
 }
 
+std::string TrigaMirror::readLine(int clientSocket)
+{
+    //Loop para ler caractere por caractere até encontrar o fim de linha
+    char c = ' ';
+    std::string line="";
+    while (c != 10)//'\n')
+    {
+        if(recv(clientSocket, &c, 1, 0) < 1)
+        {
+            std::cout << "Erro: Nada recebido\n";
+            line="";
+            break;
+        }
+        //Ler 1 caractere e armazenar na variavel c
+        line += c;
+        //std::cout << "Caractere recebido: " << c << " (ASCII: " << static_cast<int>(c) << ")\n";
+    }
+    //line += '\n';
+    //std::cout << line;
+    return line;
+}
+
+
 // Ler dados do servidor
 void TrigaMirror::readFromServer(std::string ip, int port, int read_tax) 
 {
-    ip = "127.0.0.1";
-    std::cout << "ENTREI!\n" << ip << "\n" << port << "\n";
     int clientSocket;
     struct sockaddr_in serverAddr;
     // Configurar endereço do servidor
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(port);
     serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
-    char c;
-    auto line = std::shared_ptr <std::string> (new std::string);
 
     // Loop eterno para tentar conectar o tempo todo
     while (true)
@@ -125,36 +144,18 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
         std::cout << "Conectado!\n";
 
         // Enviar taxa de amostragem
-        send(clientSocket, std::to_string(read_tax).c_str(), sizeof(std::to_string(read_tax)), 0);
+        send(clientSocket, std::to_string(read_tax).c_str(), std::to_string(read_tax).length(), 0);
 
-        //Implementar aqui lógica para header
-        //
-        // HEADER
-        // HEADER
-        // HEADER
-        // HEADER
-        //
+        //Salvar header
+        if(header) while (dataHeader == "") dataHeader = readLine(clientSocket);
 
+        auto line = std::shared_ptr <std::string> (new std::string);
         //Loop eterno para, caso esteja conectado, ler o tempo todo
         while (true)
         {
-            //Loop para ler caractere por caractere até encontrar o fim de linha
-            c = ' ';
-            *line="";
-            while (c != 10)//'\n')
-            {
-                if(recv(clientSocket, &c, 1, 0) < 1)
-                {
-                    std::cout << "Erro: Nada recebido\n";
-                    *line="";
-                    break;
-                }
-                //Ler 1 caractere e armazenar na variavel c
-                std::cout << "Caractere recebido: " << c << " (ASCII: " << static_cast<int>(c) << ")\n";
-                *line += c;
-            }
+            *line = readLine(clientSocket);
             data_global.store(line);
-            std::cout << line;
+            std::cout << *line;
         }
     }
 }

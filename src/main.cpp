@@ -59,7 +59,7 @@ CONFIG configOptions(int argc, char* argv[])
         ("i,ip",      "Ip of TrigaServer", cxxopts::value<std::string>())
         ("p,port",    "Port of TrigaServer and TrigaMirror",cxxopts::value<int>())
         ("t,tax",     "Read tax of TrigaServer in ms",cxxopts::value<int>())
-        ("d,header",  "Save and mirror the heaDer also",cxxopts::value<bool>())
+        ("d,header",  "Save and mirror the heaDer also",cxxopts::value<int>())
         ("m,mirror",  "Change port of TrigaMirror",cxxopts::value<int>());
 
     auto result = options.parse(argc, argv);
@@ -88,7 +88,7 @@ CONFIG configOptions(int argc, char* argv[])
     if (result.count("ip")     || result.count("i")) config.server_ip = result["ip"].as<std::string>();
     if (result.count("port")   || result.count("p")) config.server_port = result["port"].as<int>();
     if (result.count("tax")    || result.count("t")) config.read_tax = result["tax"].as<int>();
-    if (result.count("header") || result.count("d")) config.header = result["header"].as<bool>();
+    if (result.count("header") || result.count("d")) config.header = result["header"].as<int>();
     if (result.count("mirror") || result.count("m")) config.mirror_port = result["mirror"].as<int>();
 
     if(config.mirror_port==0) //Se não foi selecionada uma porta para o mirror
