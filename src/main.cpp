@@ -39,108 +39,75 @@ void showLicense()
 
 struct CONFIG
 {
-    std::string server_ip        = "192.168.1.100"; //
-    //int         server_port      = 123;
-    //int         mirror_port      = 123;
-    int         error_interval   = 2;//
+    std::string server_ip        = "localhost";
+    int         server_port      = 123;
+    int         read_tax         = 1000;
+    bool        header           = false;
+    int         mirror_port      = 0;    //Caso mirror_port não seja alterado pela linha de comando, será igualado a server_port
+    int         close            = false;
 };
 
-CONFIG readConfigFile(std::string filename)
+CONFIG configOptions(int argc, char* argv[])
 {
     CONFIG config;
-    
-    std::ifstream configFile(filename);
-    
-    if (!configFile.is_open()) 
-    {
-        std::cerr << "[readConfigFile] Erro ao abrir o arquivo de configuração: " << filename << std::endl;
-        filename = "trigamirror.conf";
-        std::ifstream configFile(filename);
-        std::cerr << "[readConfigFile] Tentando abrir: " << filename << std::endl;
-        if (!configFile.is_open()) 
-        {
-            std::cerr << "[readConfigFile] Erro ao abrir o arquivo de configuração: " << filename << std::endl;
-            std::cerr << "[readConfigFile] Configurações setadas como padrão" << std::endl;
-            return config;
-        }
-    }
 
-    std::string line;
-    while (std::getline(configFile, line)) {
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = line.substr(0, pos);
-            std::string value = line.substr(pos + 1);
-
-            // Remova espaços em branco extras
-            key.erase(0, key.find_first_not_of(" \t"));
-            key.erase(key.find_last_not_of(" \t") + 1);
-            value.erase(0, value.find_first_not_of(" \t"));
-            value.erase(value.find_last_not_of(" \t") + 1);
-
-            if      (key == "ip")               config.server_ip      = value.c_str();
-            else if (key == "error_interval")   config.error_interval = std::stoi(value.c_str());
-        }
-    }
-
-    configFile.close();
-    return config;
-
-}
-
-int main(int argc, char* argv[])
-{
-    signal(SIGPIPE, SIG_IGN);
-    std::string filename = "/etc/trigamirror.conf";
-    cxxopts::Options options("TrigaMirror","TrigaMirror is a software for GNU operating system to get flux data from TrigaServer and share in network.");
-    int port = 12345;
-
+    cxxopts::Options options("trigamirror","TrigaMirror is a software for GNU operating system to get flux data from TrigaServer and share in network.\n");
     options.add_options()
         ("v,version", "Show the program version")
         ("h,help",    "Show this help message")
         ("l,license", "Show info of the license")
-        ("c,config",  "Change the configuration file")
-        ("p,port",    "Port of TrigaServer to mirror");
+        ("i,ip",      "Ip of TrigaServer", cxxopts::value<std::string>())
+        ("p,port",    "Port of TrigaServer and TrigaMirror",cxxopts::value<int>())
+        ("t,tax",     "Read tax of TrigaServer in ms",cxxopts::value<int>())
+        ("d,header",  "Save and mirror the heaDer also",cxxopts::value<bool>())
+        ("m,mirror",  "Change port of TrigaMirror",cxxopts::value<int>());
 
     auto result = options.parse(argc, argv);
 
-    if (argc >1)
+    if (result.count("version") || result.count("v"))
     {
-        if (result.count("version") || result.count("v")){
-            showVersion();
-            return 0;
-        } else if (result.count("help") || result.count("h")){
-            std::cout << options.help() << std::endl;
-            return 0;
-        } else if (result.count("license") || result.count("l")) {
-            showLicense();
-            return 0;
-        } else if (result.count("config") || result.count("c")){
-            if (result["config"].as<std::string>().empty()) {
-                std::cerr << "Error: Please provide a filename for --config option." << std::endl;
-                return 1;
-            }
-            filename = result["config"].as<std::string>();
-        } else if (result.count("port") || result.count("p")){
-            if (result["port"].as<std::string>().empty()) {
-                std::cerr << "Error: Please provide a port for --port option." << std::endl;
-                return 1;
-            }
-            port = result["port"].as<int>();
-        } else {
-            std::cout << options.help() << std::endl;
-            return 1;
-        }
-    }
+        showVersion();
+        config.close = 1;
+        return config;
+    } 
 
-    CONFIG config = readConfigFile(filename);
+    if (result.count("help") || result.count("h"))
+    {
+        std::cout << options.help() << std::endl;
+        config.close = 1;
+        return config;
+    } 
 
-    TrigaMirror mirror       (config.server_ip, port);
-    std::thread mirrorThread (&TrigaMirror::createMirror, &mirror, port);
+    if (result.count("license") || result.count("l")) 
+    {
+        showLicense();
+        config.close = 1;
+        return config;
+    } 
 
-    mirrorThread.detach();
+    if (result.count("ip")     || result.count("i")) config.server_ip = result["ip"].as<std::string>();
+    if (result.count("port")   || result.count("p")) config.server_port = result["port"].as<int>();
+    if (result.count("tax")    || result.count("t")) config.read_tax = result["tax"].as<int>();
+    if (result.count("header") || result.count("d")) config.header = result["header"].as<bool>();
+    if (result.count("mirror") || result.count("m")) config.mirror_port = result["mirror"].as<int>();
 
-    while(true){}
+    if(config.mirror_port==0) //Se não foi selecionada uma porta para o mirror
+    config.mirror_port = config.server_port; //Replique a mesma porta do server
+    return config;
+}
+
+int main(int argc, char* argv[])
+{
+    signal(SIGPIPE, SIG_IGN); //Ignorar sinal SIGPIPE quando cliente se desconecta
+
+    CONFIG config = configOptions(argc, argv); //Ler configurações da linha de comando
+    if(config.close) return config.close;      //Em caso de erro ou opções extras, encerre o programa.
+
+    TrigaMirror mirror       (config.server_ip, config.server_port, config.read_tax, config.header); //Conectar ao servidor
+    std::thread mirrorThread (&TrigaMirror::createMirror, &mirror, config.mirror_port); //Criar servidor espelho
+    mirrorThread.detach(); //Desacoplar Thread
+    
+    while(true){} //Loop infinito
     
     return 0;
 }

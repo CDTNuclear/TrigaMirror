@@ -1,0 +1,12 @@
+[Unit]
+Description=TrigaMirror is a software for GNU operating system to get flux data from TrigaServer and share in network.
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/trigamirror/trigamirror-%i.conf
+ExecStart=${CMAKE_INSTALL_BIN}/usr/local/bin/trigamirror -i %SERVER_IP -p $SERVER_PORT -t $READ_TAX -m $MIRROR_PORT -d $MIRROR_HEADER
+Restart=always
+User=trigamirror
+
+[Install]
+WantedBy=multi-user.target

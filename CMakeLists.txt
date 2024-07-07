@@ -44,8 +44,8 @@ target_compile_options(
 
 install(TARGETS trigamirror)
 if("${DONT_INSTALL_CONF}" STREQUAL "")
-  install(FILES ${PROJECT_SOURCE_DIR}/resources/trigamirror.conf
-          DESTINATION /etc/)
+  install(FILES ${PROJECT_SOURCE_DIR}/resources/trigamirror-EXEMPLE.conf
+          DESTINATION /etc/trigamirror/)
 endif()
 
 if(SYSTEMD_FOUND)
@@ -56,8 +56,8 @@ if(SYSTEMD_FOUND)
     string(REGEX REPLACE "[ \t\n]+" "" SYSTEMD_SERVICES_INSTALL_DIR
                          "${SYSTEMD_SERVICES_INSTALL_DIR}")
   endif()
-  configure_file(${PROJECT_SOURCE_DIR}/resources/trigamirror.service
-                 ${CMAKE_BINARY_DIR}/trigamirror.service)
-  install(FILES ${CMAKE_BINARY_DIR}/trigamirror.service
+  configure_file(${PROJECT_SOURCE_DIR}/resources/trigamirror@.service
+                 ${CMAKE_BINARY_DIR}/trigamirror@.service)
+  install(FILES ${CMAKE_BINARY_DIR}/trigamirror@.service
           DESTINATION ${SYSTEMD_SERVICES_INSTALL_DIR})
 endif()

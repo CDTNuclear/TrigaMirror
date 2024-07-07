@@ -19,15 +19,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //TrigaMirror.cpp
 #include "TrigaMirror.h"
 
-TrigaMirror::TrigaMirror(std::string ip, int port)
+TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header)
 {
-    std::thread readFromServerThread   (&TrigaMirror::readFromServer, this, ip, port);
+    this->header = header;
+    std::thread readFromServerThread   (&TrigaMirror::readFromServer, this, ip, port, read_tax);
     readFromServerThread.detach();
 }
 
 TrigaMirror::~TrigaMirror() {}
 
-void TrigaMirror::createMirror(int port) {
+void TrigaMirror::createMirror(int port)
+{
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
@@ -84,6 +86,7 @@ void TrigaMirror::handleTCPClients(int clientSocket)
     // Create new thread
     std::thread([this, interval, clientSocket]()
     {
+        if(header) send(clientSocket, dataHeader.c_str(), sizeof(dataHeader), 0);
         while(true)
         {
             std::string data = *data_global.load();
@@ -95,8 +98,9 @@ void TrigaMirror::handleTCPClients(int clientSocket)
 }
 
 // Ler dados do servidor
-void TrigaMirror::readFromServer(std::string ip, int port) 
+void TrigaMirror::readFromServer(std::string ip, int port, int read_tax) 
 {
+    ip = "127.0.0.1";
     std::cout << "ENTREI!\n" << ip << "\n" << port << "\n";
     int clientSocket;
     struct sockaddr_in serverAddr;
@@ -121,8 +125,15 @@ void TrigaMirror::readFromServer(std::string ip, int port)
         std::cout << "Conectado!\n";
 
         // Enviar taxa de amostragem
-        const char tax[6] = "10000";
-        send(clientSocket, tax, sizeof(tax), 0);
+        send(clientSocket, std::to_string(read_tax).c_str(), sizeof(std::to_string(read_tax)), 0);
+
+        //Implementar aqui lógica para header
+        //
+        // HEADER
+        // HEADER
+        // HEADER
+        // HEADER
+        //
 
         //Loop eterno para, caso esteja conectado, ler o tempo todo
         while (true)
