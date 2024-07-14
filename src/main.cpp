@@ -85,10 +85,10 @@ CONFIG configOptions(int argc, char* argv[])
         return config;
     } 
 
-    if (result.count("ip")     || result.count("i")) config.server_ip = result["ip"].as<std::string>();
+    if (result.count("ip")     || result.count("i")) config.server_ip   = result["ip"].as<std::string>();
     if (result.count("port")   || result.count("p")) config.server_port = result["port"].as<int>();
-    if (result.count("tax")    || result.count("t")) config.read_tax = result["tax"].as<int>();
-    if (result.count("header") || result.count("d")) config.header = result["header"].as<int>();
+    if (result.count("tax")    || result.count("t")) config.read_tax    = result["tax"].as<int>();
+    if (result.count("header") || result.count("d")) config.header      = result["header"].as<int>();
     if (result.count("mirror") || result.count("m")) config.mirror_port = result["mirror"].as<int>();
 
     if(config.mirror_port==0) //Se não foi selecionada uma porta para o mirror

@@ -134,17 +134,30 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
     while (true)
     {
         clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (clientSocket < 0) std::cerr << "Erro ao criar socket.\n";
-
+        if (clientSocket < 0)
+        {
+            std::cerr << "Erro ao criar socket.\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            continue;
+        }
         // Conectar ao servidor
-        std::cout << "Tentando conectar!\n";
+        //std::cout << "Tentando conectar!\n";
         if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
             std::cerr << "Erro ao conectar ao servidor.\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            close(clientSocket);
+            continue;
         }
-        std::cout << "Conectado!\n";
+        //std::cout << "Conectado!\n";
 
         // Enviar taxa de amostragem
-        send(clientSocket, std::to_string(read_tax).c_str(), std::to_string(read_tax).length(), 0);
+        if(!send(clientSocket, std::to_string(read_tax).c_str(), std::to_string(read_tax).length(), 0))
+        {
+            std::cerr << "Erro ao enviar mensagem para servidor.\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            close(clientSocket);
+            continue;
+        }
 
         //Salvar header
         if(header) while (dataHeader == "") dataHeader = readLine(clientSocket);
@@ -155,7 +168,7 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
         {
             *line = readLine(clientSocket);
             data_global.store(line);
-            std::cout << *line;
+            //std::cout << *line;
         }
     }
 }
