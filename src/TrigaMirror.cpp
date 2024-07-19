@@ -28,6 +28,38 @@ TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header)
 
 TrigaMirror::~TrigaMirror() {}
 
+void TrigaMirror::logConnection(std::string fileLocation, struct sockaddr_in clientAddr, bool sucesses, int taxAmo)
+{
+    //Montar mensagem
+    std::string message  = "TIME;";
+            message += inet_ntoa(clientAddr.sin_addr);
+            message += ";";
+            message += ntohs(clientAddr.sin_port) ;
+            message += ";";
+            message += sucesses;
+            message += ";";
+            message += taxAmo;
+            message += ";\n";
+
+    //Abrir arquivo
+    fileLocation += inet_ntoa(clientAddr.sin_addr);
+    std::ofstream outfile(fileLocation);
+
+    if (outfile.is_open()) // Se o arquivo foi aberto com sucesso
+    {
+        outfile << message; // Escrever a linha no arquivo
+        outfile.close(); // Fechar o arquivo
+    }
+    else
+    {
+        message  = "Unable to create/open log file: ";
+        message += inet_ntoa(clientAddr.sin_addr);
+        message += "\n";
+        std::cerr << message;
+    }
+}
+
+
 void TrigaMirror::createMirror(int port)
 {
     int serverSocket, clientSocket;
@@ -53,34 +85,37 @@ void TrigaMirror::createMirror(int port)
     listen(serverSocket, 5);
     //std::cout << "[startServer] Server started on port " << port << std::endl;
 
-    while(true) {
+    while(true) 
+    {
         clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
-        if (clientSocket < 0) {
-            std::cerr << "[startServer] Error on accept" << std::endl;
+        if (clientSocket < 0)
+        {
+            //std::cerr << "[startServer] Error on accept - IP: "  << inet_ntoa(clientAddr.sin_addr) << ", Port: " << ntohs(clientAddr.sin_port) << std::endl;
+            logConnection("./", clientAddr, false, 0);
             continue;
-        }
-
-        //std::cout << "[startServer] Client connected" << std::endl;
-        
+        }        
         std::thread clientThread(&TrigaMirror::handleTCPClients, this, clientSocket);
         clientThread.detach();
     }
 }
 
-void TrigaMirror::handleTCPClients(int clientSocket)
+void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAddr)
 {
     int timeout = 2; // 2 seconds timeout
     char buffer[1024];
     int n = recv(clientSocket, buffer, sizeof(buffer), 0);
     if (n <= 0)
     {
-        std::cerr << "[handleTCPClients] Error receiving data" << std::endl;
+        //std::cerr << "[handleTCPClients] Error receiving data" << std::endl;
+        logConnection("./", clientAddr, false, 0);
         close(clientSocket);
         return;
     }
 
     // Parse received data (assuming it's a number)
     int interval = std::stoi(std::string(buffer, n));
+    logConnection("./", clientAddr, true, interval);
+
 
     //std::cout << "[handleTCPClients] Received interval: " << interval << "ms" << std::endl;
     // Create new thread

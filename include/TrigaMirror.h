@@ -27,6 +27,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <boost/asio.hpp>
 #include <json/json.h>
 #include <string>
+#include <fstream>
+#include <sstream>
 
 //#define TestMax
 
@@ -50,8 +52,10 @@ class TrigaMirror
         //Ponteiros inteligentes globais
         std::atomic<std::shared_ptr<std::string>> data_global = std::make_shared<std::string>();
 
+        void logConnection(std::string fileLocation, struct sockaddr_in clientAddr, bool sucesses, int taxAmo);
+
         //Função que lida com os clientes (recebe o valor de intervalo e cria uma thread para cada cliente)
-        void handleTCPClients(int clientSocket);
+        void handleTCPClients(int clientSocket, struct sockaddr_in clientAddr);
 
         //Threads de leitura de hardware
         void readFromServer(std::string ip, int port, int read_tax);
