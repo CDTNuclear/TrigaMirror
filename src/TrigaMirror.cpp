@@ -34,16 +34,26 @@ void TrigaMirror::logConnection(std::string fileLocation, struct sockaddr_in cli
     std::string message  = "TIME;";
             message += inet_ntoa(clientAddr.sin_addr);
             message += ";";
-            message += ntohs(clientAddr.sin_port) ;
+            message += std::to_string(clientAddr.sin_port);
             message += ";";
-            message += sucesses;
+            message += std::to_string(sucesses);
             message += ";";
-            message += taxAmo;
+            message += std::to_string(taxAmo);
             message += ";\n";
 
     //Abrir arquivo
     fileLocation += inet_ntoa(clientAddr.sin_addr);
-    std::ofstream outfile(fileLocation);
+    std::ifstream infile(fileLocation);
+    std::ofstream outfile;
+    if (infile.good())
+    {
+        outfile(fileLocation,std::ios::app);
+
+    }
+    else
+    {
+
+    }
 
     if (outfile.is_open()) // Se o arquivo foi aberto com sucesso
     {
@@ -94,7 +104,7 @@ void TrigaMirror::createMirror(int port)
             logConnection("./", clientAddr, false, 0);
             continue;
         }        
-        std::thread clientThread(&TrigaMirror::handleTCPClients, this, clientSocket);
+        std::thread clientThread(&TrigaMirror::handleTCPClients, this, clientSocket,clientAddr);
         clientThread.detach();
     }
 }
@@ -111,7 +121,14 @@ void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAd
         close(clientSocket);
         return;
     }
-
+    //Caso algum digito não numero for recebido, encerre a execução
+    for (int i = 0; i < n-1; ++i) if (!isdigit(buffer[i])) 
+    {
+        //std::cerr << "[handleTCPClients] Error: client sent a not number" << std::endl;
+        logConnection("./", clientAddr, false, 0);
+        close(clientSocket);
+        return;
+    }
     // Parse received data (assuming it's a number)
     int interval = std::stoi(std::string(buffer, n));
     logConnection("./", clientAddr, true, interval);
