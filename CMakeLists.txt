@@ -11,6 +11,7 @@ project(
 
 set(CMAKE_CXX_STANDARD 20)
 cmake_policy(SET CMP0079 NEW)
+cmake_policy(SET CMP0167 NEW)
 
 find_package(PkgConfig REQUIRED)
 find_package(Boost 1.81 REQUIRED COMPONENTS system)
