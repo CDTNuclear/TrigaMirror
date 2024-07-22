@@ -15,6 +15,7 @@ cmake_policy(SET CMP0167 NEW)
 
 find_package(PkgConfig REQUIRED)
 find_package(Boost 1.81 REQUIRED COMPONENTS system)
+find_package(OpenSSL REQUIRED)
 
 pkg_search_module(SYSTEMD "systemd")
 pkg_search_module(cxxopts REQUIRED IMPORTED_TARGET cxxopts)
@@ -37,7 +38,9 @@ target_link_libraries(
   trigamirror
   PRIVATE ${Boost_LIBRARIES}
           PkgConfig::cxxopts
-)
+          OpenSSL::SSL 
+          OpenSSL::Crypto)
+
 
 target_compile_options(
   trigamirror

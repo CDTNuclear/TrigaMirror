@@ -45,7 +45,8 @@ struct CONFIG
     bool        header           = false;
     int         mirror_port      = 0;    //Caso mirror_port não seja alterado pela linha de comando, será igualado a server_port
     int         close            = false;
-    std::string log_folder        = "";
+    std::string log_folder       = "";
+    std::string key_path         = "";
 };
 
 CONFIG configOptions(int argc, char* argv[])
@@ -62,7 +63,8 @@ CONFIG configOptions(int argc, char* argv[])
         ("t,tax",     "Read tax of TrigaServer in ms",cxxopts::value<int>())
         ("d,header",  "Save and mirror the heaDer also",cxxopts::value<int>())
         ("m,mirror",  "Change port of TrigaMirror",cxxopts::value<int>())
-        ("g,log",     "Save log of connections and choose a place to save",cxxopts::value<int>());
+        ("g,log",     "Save log of connections and choose a place to save",cxxopts::value<std::string>())
+        ("s,sing",    "Sing (encrypt) data before send",cxxopts::value<std::string>());
 
     auto result = options.parse(argc, argv);
 
@@ -93,6 +95,7 @@ CONFIG configOptions(int argc, char* argv[])
     if (result.count("header") || result.count("d")) config.header      = result["header"].as<int>();
     if (result.count("mirror") || result.count("m")) config.mirror_port = result["mirror"].as<int>();
     if (result.count("log")    || result.count("g")) config.log_folder  = result["log"].as<std::string>();
+    if (result.count("sing")   || result.count("s")) config.key_path    = result["sing"].as<std::string>();
 
     if(config.mirror_port==0) //Se não foi selecionada uma porta para o mirror
     config.mirror_port = config.server_port; //Replique a mesma porta do server
@@ -106,7 +109,7 @@ int main(int argc, char* argv[])
     CONFIG config = configOptions(argc, argv); //Ler configurações da linha de comando
     if(config.close) return config.close;      //Em caso de erro ou opções extras, encerre o programa.
 
-    TrigaMirror mirror       (config.server_ip, config.server_port, config.read_tax, config.header, config.log_folder); //Conectar ao servidor
+    TrigaMirror mirror       (config.server_ip, config.server_port, config.read_tax, config.header, config.log_folder,config.key_path); //Conectar ao servidor
     std::thread mirrorThread (&TrigaMirror::createMirror, &mirror, config.mirror_port); //Criar servidor espelho
     mirrorThread.detach(); //Desacoplar Thread
     

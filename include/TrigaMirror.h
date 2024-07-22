@@ -30,6 +30,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <openssl/pem.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 //#define TestMax
 
@@ -39,7 +42,7 @@ using boost::asio::ip::tcp;
 class TrigaMirror
 {
     public:
-        TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder);
+        TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder, std::string privKeyPath);
         ~TrigaMirror();
 
         //Função que cria servidor TCP
@@ -65,6 +68,11 @@ class TrigaMirror
         void readFromServer(std::string ip, int port, int read_tax);
 
         std::string readLine(int clientSocket);
+
+        //Criptografia
+        std::string privKeyPath;
+        std::string signMessage(const std::string& message);
+
 };
 
 #endif

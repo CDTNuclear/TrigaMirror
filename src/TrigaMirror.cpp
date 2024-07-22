@@ -19,8 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //TrigaMirror.cpp
 #include "TrigaMirror.h"
 
-TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder)
+TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder, std::string privKeyPath)
 {
+    this->privKeyPath = privKeyPath;
     this->header = header;
     this->logFolder = logFolder;
     std::thread readFromServerThread   (&TrigaMirror::readFromServer, this, ip, port, read_tax);
@@ -145,7 +146,12 @@ void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAd
         if(header) send(clientSocket, dataHeader.c_str(), dataHeader.length(), 0);
         while(true)
         {
-            std::string data = *data_global.load();
+            std::string data = *data_global.load(); //Leia do vetor global os dados
+            if (privKeyPath != "")  
+            {
+                data = signMessage(data);   //Encript a mensagem
+                data = std::to_string(data.length()) + "\n" + data; //Salve o tamanho dos dados primeiro
+            }
             if(send(clientSocket, data.c_str(), data.length(), 0) <= 0) break;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(interval));
@@ -227,4 +233,71 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
             //std::cout << *line;
         }
     }
+}
+
+std::string TrigaMirror::signMessage(const std::string& message) 
+{
+    // Inicialize a biblioteca OpenSSL
+    OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();
+
+    // Ler a chave privada do arquivo
+    FILE* privKeyFile = fopen(privKeyPath.c_str(), "r");
+    if (!privKeyFile) {
+        std::cerr << "Erro ao abrir o arquivo de chave privada." << std::endl;
+        return "";
+    }
+
+    EVP_PKEY* pkey = PEM_read_PrivateKey(privKeyFile, nullptr, nullptr, nullptr);
+    fclose(privKeyFile);
+    if (!pkey) {
+        std::cerr << "Erro ao ler a chave privada." << std::endl;
+        return "";
+    }
+
+    EVP_MD_CTX* mdctx = EVP_MD_CTX_new();
+    if (!mdctx) {
+        std::cerr << "Erro ao criar o contexto de MD." << std::endl;
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    // Inicializar o contexto para assinatura
+    if (EVP_DigestSignInit(mdctx, nullptr, EVP_sha256(), nullptr, pkey) <= 0) {
+        std::cerr << "Erro ao inicializar a assinatura." << std::endl;
+        EVP_MD_CTX_free(mdctx);
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    // Adicionar a mensagem para a assinatura
+    if (EVP_DigestSignUpdate(mdctx, message.data(), message.size()) <= 0) {
+        std::cerr << "Erro ao atualizar a assinatura." << std::endl;
+        EVP_MD_CTX_free(mdctx);
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    // Obter o tamanho da assinatura
+    size_t siglen = 0;
+    if (EVP_DigestSignFinal(mdctx, nullptr, &siglen) <= 0) {
+        std::cerr << "Erro ao obter o tamanho da assinatura." << std::endl;
+        EVP_MD_CTX_free(mdctx);
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    // Criar um buffer para armazenar a assinatura
+    std::string signature(siglen, '\0');
+    if (EVP_DigestSignFinal(mdctx, reinterpret_cast<unsigned char*>(&signature[0]), &siglen) <= 0) {
+        std::cerr << "Erro ao finalizar a assinatura." << std::endl;
+        EVP_MD_CTX_free(mdctx);
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    // Limpar
+    EVP_MD_CTX_free(mdctx);
+    EVP_PKEY_free(pkey);
+    return signature;
 }
