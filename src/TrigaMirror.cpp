@@ -19,53 +19,57 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //TrigaMirror.cpp
 #include "TrigaMirror.h"
 
-TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header)
+TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder)
 {
     this->header = header;
+    this->logFolder = logFolder;
     std::thread readFromServerThread   (&TrigaMirror::readFromServer, this, ip, port, read_tax);
     readFromServerThread.detach();
 }
 
 TrigaMirror::~TrigaMirror() {}
 
-void TrigaMirror::logConnection(std::string fileLocation, struct sockaddr_in clientAddr, bool sucesses, int taxAmo)
+void TrigaMirror::logConnection(struct sockaddr_in clientAddr, bool sucesses, int taxAmo)
 {
+    if (logFolder=="") return; //Se logFolder for nulo, não salve log de conexão.
+
     //Montar mensagem
-    std::string message  = "TIME;";
-            message += inet_ntoa(clientAddr.sin_addr);
-            message += ";";
-            message += std::to_string(clientAddr.sin_port);
-            message += ";";
-            message += std::to_string(sucesses);
-            message += ";";
-            message += std::to_string(taxAmo);
-            message += ";\n";
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm *parts = std::localtime(&now_c);
+
+    std::ostringstream message;
+            message <<  std::put_time(parts, "%Y-%m-%d %H:%M:%S");
+            message << ";";
+            message << inet_ntoa(clientAddr.sin_addr);
+            message << ";";
+            message << std::to_string(clientAddr.sin_port);
+            message << ";";
+            message << std::to_string(sucesses);
+            message << ";";
+            message << std::to_string(taxAmo);
+            message << ";\n";
+
+    //Endereço da pasta + / + nome do arquivo
+    std::string fileLocation = logFolder + "/" + inet_ntoa(clientAddr.sin_addr);
+
+    //Verificar se arquivo já existe
+    bool alreadyExist = std::filesystem::exists(fileLocation);
 
     //Abrir arquivo
-    fileLocation += inet_ntoa(clientAddr.sin_addr);
-    std::ifstream infile(fileLocation);
-    std::ofstream outfile;
-    if (infile.good())
-    {
-        outfile(fileLocation,std::ios::app);
-
-    }
-    else
-    {
-
-    }
-
+    std::ofstream outfile(fileLocation,std::ios::app);
     if (outfile.is_open()) // Se o arquivo foi aberto com sucesso
     {
-        outfile << message; // Escrever a linha no arquivo
+        if(!alreadyExist) outfile << "TIME;IP;PORT;SUCESSES;TaxAmo;\n";//Caso o arquivo esteja sendo criado agora, escreva o cabeçalho
+        outfile << message.str(); // Escrever a linha no arquivo
         outfile.close(); // Fechar o arquivo
     }
     else
     {
-        message  = "Unable to create/open log file: ";
-        message += inet_ntoa(clientAddr.sin_addr);
-        message += "\n";
-        std::cerr << message;
+        message.str("[ logConnection() ] Unable to create/open log file: ");
+        message << fileLocation;
+        message << "\n";
+        std::cerr << message.str();
     }
 }
 
@@ -101,7 +105,7 @@ void TrigaMirror::createMirror(int port)
         if (clientSocket < 0)
         {
             //std::cerr << "[startServer] Error on accept - IP: "  << inet_ntoa(clientAddr.sin_addr) << ", Port: " << ntohs(clientAddr.sin_port) << std::endl;
-            logConnection("./", clientAddr, false, 0);
+            logConnection(clientAddr, false, 0);
             continue;
         }        
         std::thread clientThread(&TrigaMirror::handleTCPClients, this, clientSocket,clientAddr);
@@ -117,7 +121,7 @@ void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAd
     if (n <= 0)
     {
         //std::cerr << "[handleTCPClients] Error receiving data" << std::endl;
-        logConnection("./", clientAddr, false, 0);
+        logConnection(clientAddr, false, 0);
         close(clientSocket);
         return;
     }
@@ -125,13 +129,13 @@ void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAd
     for (int i = 0; i < n-1; ++i) if (!isdigit(buffer[i])) 
     {
         //std::cerr << "[handleTCPClients] Error: client sent a not number" << std::endl;
-        logConnection("./", clientAddr, false, 0);
+        logConnection(clientAddr, false, 0);
         close(clientSocket);
         return;
     }
     // Parse received data (assuming it's a number)
     int interval = std::stoi(std::string(buffer, n));
-    logConnection("./", clientAddr, true, interval);
+    logConnection(clientAddr, true, interval);
 
 
     //std::cout << "[handleTCPClients] Received interval: " << interval << "ms" << std::endl;

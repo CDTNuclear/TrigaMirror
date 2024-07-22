@@ -29,6 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 
 //#define TestMax
 
@@ -38,7 +39,7 @@ using boost::asio::ip::tcp;
 class TrigaMirror
 {
     public:
-        TrigaMirror(std::string ip, int port, int read_tax, bool header);
+        TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder);
         ~TrigaMirror();
 
         //Função que cria servidor TCP
@@ -48,11 +49,14 @@ class TrigaMirror
         //Save header
         bool header;
         std::string dataHeader = "";
+        
+        //Log
+        std::string logFolder;
 
         //Ponteiros inteligentes globais
         std::atomic<std::shared_ptr<std::string>> data_global = std::make_shared<std::string>();
 
-        void logConnection(std::string fileLocation, struct sockaddr_in clientAddr, bool sucesses, int taxAmo);
+        void logConnection(struct sockaddr_in clientAddr, bool sucesses, int taxAmo);
 
         //Função que lida com os clientes (recebe o valor de intervalo e cria uma thread para cada cliente)
         void handleTCPClients(int clientSocket, struct sockaddr_in clientAddr);

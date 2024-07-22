@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 EnvironmentFile=/etc/trigamirror/trigamirror-%i.conf
-ExecStart=${CMAKE_INSTALL_BIN}/usr/local/bin/trigamirror -i %SERVER_IP -p $SERVER_PORT -t $READ_TAX -m $MIRROR_PORT -d $MIRROR_HEADER
+ExecStart=${CMAKE_INSTALL_BIN}/usr/local/bin/trigamirror -i %SERVER_IP -p $SERVER_PORT -t $READ_TAX -m $MIRROR_PORT -d $MIRROR_HEADER -g $LOG_FOLDER
 Restart=always
 User=trigamirror
 
