@@ -30,9 +30,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <fstream>
 #include <sstream>
 #include <filesystem>
-#include <openssl/pem.h>
-#include <openssl/evp.h>
-#include <openssl/err.h>
 
 //#define TestMax
 
@@ -71,7 +68,7 @@ class TrigaMirror
 
         //Criptografia
         std::string privKeyPath;
-        std::string signMessage(const std::string& message);
+        std::string signMessage(const std::string message);
 
 };
 
