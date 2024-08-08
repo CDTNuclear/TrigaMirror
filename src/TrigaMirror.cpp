@@ -19,11 +19,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //TrigaMirror.cpp
 #include "TrigaMirror.h"
 
-TrigaMirror::TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder, std::string privKeyPath)
+TrigaMirror::TrigaMirror(std::string ip, 
+                        int port, 
+                        int read_tax, 
+                        int kind, 
+                        std::string logFolder, 
+                        std::string privKeyPath)
 {
+    this->kind = kind;    
     this->privKeyPath = privKeyPath;
-    this->header = header;
     this->logFolder = logFolder;
+    
     std::thread readFromServerThread   (&TrigaMirror::readFromServer, this, ip, port, read_tax);
     readFromServerThread.detach();
 }
@@ -98,14 +104,12 @@ void TrigaMirror::createMirror(int port)
     }
 
     listen(serverSocket, 5);
-    //std::cout << "[startServer] Server started on port " << port << std::endl;
 
     while(true) 
     {
         clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
         if (clientSocket < 0)
         {
-            //std::cerr << "[startServer] Error on accept - IP: "  << inet_ntoa(clientAddr.sin_addr) << ", Port: " << ntohs(clientAddr.sin_port) << std::endl;
             logConnection(clientAddr, false, 0);
             continue;
         }        
@@ -116,20 +120,31 @@ void TrigaMirror::createMirror(int port)
 
 void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAddr)
 {
-    int timeout = 2; // 2 seconds timeout
+    bool sign=0; 
+    const int timeout = 0;
     char buffer[1024];
-    int n = recv(clientSocket, buffer, sizeof(buffer), 0);
+    int n = recv(clientSocket, buffer, sizeof(buffer), timeout);
     if (n <= 0)
     {
-        //std::cerr << "[handleTCPClients] Error receiving data" << std::endl;
         logConnection(clientAddr, false, 0);
         close(clientSocket);
         return;
     }
+    if (buffer[0]=='s') //Caso o primeiro caractere seja s
+    {
+        if(privKeyPath == "") 
+        {
+            logConnection(clientAddr, false, 0);
+            close(clientSocket);
+            return;
+        }
+        //Se buffer[0]=='s' e privKeyPath != ""
+        sign=1;//Assine a mensagem
+        buffer[0]='0';//Troque o primeiro caractere por 0 para não dar erro ao interpretar um inteiro
+    }
     //Caso algum digito não numero for recebido, encerre a execução
     for (int i = 0; i < n-1; ++i) if (!isdigit(buffer[i])) 
     {
-        //std::cerr << "[handleTCPClients] Error: client sent a not number" << std::endl;
         logConnection(clientAddr, false, 0);
         close(clientSocket);
         return;
@@ -139,21 +154,51 @@ void TrigaMirror::handleTCPClients(int clientSocket, struct sockaddr_in clientAd
     logConnection(clientAddr, true, interval);
 
 
-    //std::cout << "[handleTCPClients] Received interval: " << interval << "ms" << std::endl;
-    // Create new thread
-    std::thread([this, interval, clientSocket]()
+    if (sign)
     {
-        if(privKeyPath != "") dataHeader         = signMessage(dataHeader);
-        if(header) send(clientSocket, dataHeader.c_str(), dataHeader.length(), 0);
+        //Use a chave privada para criptografar a mensagem de 63 bytes em pacotes de 256 bytes
+        int numPkgs;//Variavel para armazenar a quantidade de pacotes
+        
+        //Se for RAW envie a quantidade de bytes primeiro
+        if (kind==0)
+        {
+            std::string dataSizeSigned = signMessage(std::to_string(qtdBytes)+"\n", &numPkgs); ;
+            if(send(clientSocket, dataSizeSigned.c_str(), numPkgs*256, 0) <= 0) 
+                return;
+        }
+
+        if (kind==1) //Se for CSV envie o cabeçalho primeiro
+        {
+            std::string dataHeaderSigned = signMessage(dataHeader, &numPkgs);
+            send(clientSocket, dataHeaderSigned.c_str(), numPkgs*256, 0);
+        }
+        while(true)
+        {
+            std::string data = signMessage(*data_global.load(), &numPkgs); //Leia do vetor global os dados
+            if(send(clientSocket, data.c_str(), numPkgs*256, 0) <= 0) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+        }        
+    }
+    else
+    {
+        //Se for RAW envie a quantidade de bytes primeiro
+        if (kind==0)
+        {
+            std::string dataSize = std::to_string(qtdBytes)+"\n";
+            if(send(clientSocket, dataSize.c_str(), dataSize.length(), 0) <= 0) 
+                return;
+        }
+
+        //Se for CSV envie o cabeçalho primeiro
+        if (kind==1) send(clientSocket, dataHeader.c_str(), dataHeader.length(), 0);
+
         while(true)
         {
             std::string data = *data_global.load(); //Leia do vetor global os dados
-            if(privKeyPath != "") data = signMessage(data);
-            if(send(clientSocket, data.c_str(), data.length(), 0) <= 0) break;
-
+            if(send(clientSocket, data.c_str(), (kind == 0) ? qtdBytes : data.length(), 0) <= 0) break;//Metodo length() não funciona com RAW pq caracter nulo (\0) interrompe contagem de tamanho, por isso qtdBytes tem que ser passado manualmente
             std::this_thread::sleep_for(std::chrono::milliseconds(interval));
         }
-    }).detach();
+    }
 }
 
 std::string TrigaMirror::readLine(int clientSocket)
@@ -165,7 +210,7 @@ std::string TrigaMirror::readLine(int clientSocket)
     {
         if(recv(clientSocket, &c, 1, 0) < 1)
         {
-            std::cout << "Erro: Nada recebido\n";
+            std::cerr << "Erro: Nada recebido\n";
             line="";
             break;
         }
@@ -218,16 +263,54 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
             continue;
         }
 
-        //Salvar header
-        if(header) while (dataHeader == "") dataHeader = readLine(clientSocket);
-
-        auto line = std::shared_ptr <std::string> (new std::string);
-        //Loop eterno para, caso esteja conectado, ler o tempo todo
-        while (true)
+        //Logica de ler o servidor varia com o tipo
+        if (kind==0)//RAW
         {
-            *line = readLine(clientSocket);
-            data_global.store(line);
-            //std::cout << *line;
+            qtdBytes = std::stoi(readLine(clientSocket));
+            auto bytes = std::shared_ptr <std::string> (new std::string);
+            //Loop eterno para, caso esteja conectado, ler o tempo todo
+            while (true)
+            {
+                char byte[qtdBytes];
+                if(recv(clientSocket, byte, qtdBytes, 0) < 1)
+                {
+                    std::cerr << "Erro: Nada recebido\n";
+                    break;
+                }
+                bytes->assign(byte, qtdBytes);
+                data_global.store(bytes);
+                //std::cout << *line;
+            }
+        }
+        else if (kind==1)//CSV
+        {
+            //Salvar header
+            if(kind==1) while (dataHeader == "") dataHeader = readLine(clientSocket);
+
+            auto line = std::shared_ptr <std::string> (new std::string);
+            //Loop eterno para, caso esteja conectado, ler o tempo todo
+            while (true)
+            {
+                *line = readLine(clientSocket);
+                data_global.store(line);
+                //std::cout << *line;
+            }
+        }
+        else//JSON
+        {
+            auto json = std::shared_ptr <std::string> (new std::string);
+            //Loop eterno para, caso esteja conectado, ler o tempo todo
+            while (true)
+            {
+                std::string line;
+                while (line!="    }\n")
+                {
+                    line = readLine(clientSocket);
+                    *json += line;
+                }
+                data_global.store(json);
+                //std::cout << *json;
+            }
         }
     }
 }

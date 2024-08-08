@@ -42,7 +42,8 @@ struct CONFIG
     std::string server_ip        = "localhost";
     int         server_port      = 123;
     int         read_tax         = 1000;
-    bool        header           = false;
+    int         kind             = 1;
+    std::string kind_aux         = "";
     int         mirror_port      = 0;    //Caso mirror_port não seja alterado pela linha de comando, será igualado a server_port
     int         close            = false;
     std::string log_folder       = "";
@@ -61,10 +62,12 @@ CONFIG configOptions(int argc, char* argv[])
         ("i,ip",      "Ip of TrigaServer", cxxopts::value<std::string>())
         ("p,port",    "Port of TrigaServer and TrigaMirror",cxxopts::value<int>())
         ("t,tax",     "Read tax of TrigaServer in ms",cxxopts::value<int>())
-        ("d,header",  "Save and mirror the heaDer also",cxxopts::value<int>())
         ("m,mirror",  "Change port of TrigaMirror",cxxopts::value<int>())
         ("g,log",     "Save log of connections and choose a place to save",cxxopts::value<std::string>())
-        ("s,sing",    "Sing (encrypt) data before send",cxxopts::value<std::string>());
+        ("s,sing",    "Sing (encrypt) data before send",cxxopts::value<std::string>())
+        ("RAW",       "Mirror data in RAW format. Should specify the size in bytes of data")
+        ("CSV",       "Mirror data in CSV format")
+        ("JSON",      "Mirror data in JSON format. Should specify the last line of JSON file");
 
     auto result = options.parse(argc, argv);
 
@@ -92,11 +95,13 @@ CONFIG configOptions(int argc, char* argv[])
     if (result.count("ip")     || result.count("i")) config.server_ip   = result["ip"].as<std::string>();
     if (result.count("port")   || result.count("p")) config.server_port = result["port"].as<int>();
     if (result.count("tax")    || result.count("t")) config.read_tax    = result["tax"].as<int>();
-    if (result.count("header") || result.count("d")) config.header      = result["header"].as<int>();
     if (result.count("mirror") || result.count("m")) config.mirror_port = result["mirror"].as<int>();
     if (result.count("log")    || result.count("g")) config.log_folder  = result["log"].as<std::string>();
     if (result.count("sing")   || result.count("s")) config.key_path    = result["sing"].as<std::string>();
-
+    if (result.count("RAW"))                         config.kind        = 0;
+    if (result.count("CSV"))                         config.kind        = 1;
+    if (result.count("JSON"))                        config.kind        = 2;
+    
     if(config.mirror_port==0) //Se não foi selecionada uma porta para o mirror
     config.mirror_port = config.server_port; //Replique a mesma porta do server
     return config;
@@ -109,7 +114,12 @@ int main(int argc, char* argv[])
     CONFIG config = configOptions(argc, argv); //Ler configurações da linha de comando
     if(config.close) return config.close;      //Em caso de erro ou opções extras, encerre o programa.
 
-    TrigaMirror mirror       (config.server_ip, config.server_port, config.read_tax, config.header, config.log_folder,config.key_path); //Conectar ao servidor
+    TrigaMirror mirror( config.server_ip, 
+                        config.server_port, 
+                        config.read_tax, 
+                        config.kind, 
+                        config.log_folder,
+                        config.key_path); //Criar objeto e conectar ao servidor
     std::thread mirrorThread (&TrigaMirror::createMirror, &mirror, config.mirror_port); //Criar servidor espelho
     mirrorThread.detach(); //Desacoplar Thread
     

@@ -39,19 +39,27 @@ using boost::asio::ip::tcp;
 class TrigaMirror
 {
     public:
-        TrigaMirror(std::string ip, int port, int read_tax, bool header, std::string logFolder, std::string privKeyPath);
+        TrigaMirror(std::string ip, 
+                    int port, 
+                    int read_tax, 
+                    int kind, 
+                    std::string logFolder, 
+                    std::string privKeyPath);
         ~TrigaMirror();
 
         //Função que cria servidor TCP
         void createMirror(int port);
 
     private:
-        //Save header
-        bool header;
+        //Save CSV header
         std::string dataHeader = "";
         
         //Log
         std::string logFolder;
+
+        //Kind
+        int kind;
+        int qtdBytes;
 
         //Ponteiros inteligentes globais
         std::atomic<std::shared_ptr<std::string>> data_global = std::make_shared<std::string>();
