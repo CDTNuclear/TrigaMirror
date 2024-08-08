@@ -68,7 +68,7 @@ class TrigaMirror
 
         //Criptografia
         std::string privKeyPath;
-        std::string signMessage(const std::string message);
+        std::string signMessage(const std::string message, int* numPkgs);
 
 };
 

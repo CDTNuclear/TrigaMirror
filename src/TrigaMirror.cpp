@@ -232,18 +232,19 @@ void TrigaMirror::readFromServer(std::string ip, int port, int read_tax)
     }
 }
 
-std::string TrigaMirror::signMessage(const std::string message)
+std::string TrigaMirror::signMessage(const std::string message, int* numPkgs)
 {
+    *numPkgs=0;
     std::string signedMessage;
     size_t start = 0;
     size_t len = message.length();
-    while (start < len)
+    while (start < len) //percorre a mensagem em blocos de até 63 caracteres de cada vez, assinando cada bloco separadamente.
     {
         char bytes[256]= {0};
         size_t end = std::min(start + 63, len);
-        std::string command  = "echo \"\"\"";
+        std::string command  = "echo \'\'\'";
                     command += message.substr(start, end - start);
-                    command += "\"\"\" | openssl pkeyutl -sign -inkey ";
+                    command += "\'\'\' | openssl pkeyutl -sign -inkey ";
                     command += privKeyPath;
         FILE* pipe = popen(command.c_str(), "r");
         if (!pipe)
@@ -259,6 +260,7 @@ std::string TrigaMirror::signMessage(const std::string message)
             return "";
         }
         signedMessage.append(bytes,256);
+        (*numPkgs)++;
         start = end;
     }
     return signedMessage;
