@@ -121,9 +121,7 @@ int main(int argc, char* argv[])
                         config.log_folder,
                         config.key_path); //Criar objeto e conectar ao servidor
     std::thread mirrorThread (&TrigaMirror::createMirror, &mirror, config.mirror_port); //Criar servidor espelho
-    mirrorThread.detach(); //Desacoplar Thread
+    mirrorThread.join();
     
-    while(true){} //Loop infinito
-    
-    return 0;
+    return 1;
 }
